@@ -5,9 +5,28 @@ export default function Camera() {
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
+  const piecePositionRef = useRef({
+    x: 300,
+    y: 200,
+  });
+
+  const targetPositionRef = useRef({
+    x: 500,
+    y: 300,
+  });
+
+  const isSolvedRef = useRef(false);
+
   useEffect(() => {
     let animationFrameId: number;
     let stream: MediaStream | null = null;
+
+    let grabOffset = {
+      x: 0,
+      y: 0,
+    };
+
+    let isGrabbing = false;
 
     async function setup() {
       try {
@@ -55,19 +74,130 @@ export default function Camera() {
             const landmarks = results.landmarks[0];
 
             const indexTip = landmarks[8];
+            const thumbTip = landmarks[4];
 
-            const x = indexTip.x * canvas.width;
-            const y = indexTip.y * canvas.height;
+            const indexX = indexTip.x * canvas.width;
+            const indexY = indexTip.y * canvas.height;
 
+            const thumbX = thumbTip.x * canvas.width;
+            const thumbY = thumbTip.y * canvas.height;
+
+            // Calculate distance between thumb and index finger
+            const distance = Math.sqrt(
+              Math.pow(indexX - thumbX, 2) +
+              Math.pow(indexY - thumbY, 2)
+            );
+
+            const isPinching = distance < 40;
+
+            // Move the puzzle piece while pinching
+            const piece = piecePositionRef.current;
+
+            const isOverPiece =
+            indexX >= piece.x - 30 &&
+            indexX <= piece.x + 30 &&
+            indexY >= piece.y - 30 &&
+            indexY <= piece.y + 30;
+
+            if (isPinching) {
+            if (!isGrabbing && isOverPiece) {
+                // Start grabbing only if the finger is over the piece
+                grabOffset.x = piece.x - indexX;
+                grabOffset.y = piece.y - indexY;
+
+                isGrabbing = true;
+            }
+
+            if (isGrabbing) {
+                piece.x = indexX + grabOffset.x;
+                piece.y = indexY + grabOffset.y;
+            }
+            } else {
+                if (isGrabbing) {
+                    const target = targetPositionRef.current;
+                    const piece = piecePositionRef.current;
+                    
+                    // Check if the piece is close enough to the target
+                    const targetDistance = Math.sqrt(
+                    Math.pow(piece.x - target.x, 2) +
+                    Math.pow(piece.y - target.y, 2)
+                    );
+
+                    if (targetDistance < 40) {
+                        // Snap the piece to the target
+                        piece.x = target.x;
+                        piece.y = target.y;
+                        isSolvedRef.current = true;
+                        console.log("PUZZLE SOLVED YURR!");
+                    }
+                }
+                isGrabbing = false;
+            }
+
+            // Draw index fingertip
             ctx.beginPath();
-            ctx.arc(x, y, 12, 0, Math.PI * 2);
+            ctx.arc(indexX, indexY, 12, 0, Math.PI * 2);
             ctx.fill();
 
-            console.log("Index fingertip:", {
-                x,
-                y,
-            });
+            console.log(isPinching ? "PINCH" : "RELEASE");
           }
+
+          // Get current positions
+          const piece = piecePositionRef.current;
+          const target = targetPositionRef.current;
+
+        // Calculate distance between piece and target
+        const targetDistance = Math.sqrt(
+        Math.pow(piece.x - target.x, 2) +
+        Math.pow(piece.y - target.y, 2)
+        );
+
+        const isNearTarget = targetDistance < 70;
+
+        // Draw puzzle piece
+        ctx.beginPath();
+        ctx.rect(
+        piece.x - 30,
+        piece.y - 30,
+        60,
+        60
+        );
+        ctx.strokeStyle = "black";
+        ctx.lineWidth = 1;
+        ctx.stroke();
+
+        // Draw target area
+        ctx.beginPath();
+        ctx.rect(
+        target.x - 40,
+        target.y - 40,
+        80,
+        80
+        );
+
+        ctx.strokeStyle = "green";
+
+        if (isSolvedRef.current) {
+        ctx.lineWidth = 5;
+        } else if (isNearTarget) {
+        ctx.lineWidth = 3;
+        } else {
+        ctx.lineWidth = 1;
+        }
+
+        ctx.stroke();
+
+        // Draw success message
+        if (isSolvedRef.current) {
+        ctx.font = "24px sans-serif";
+        ctx.fillStyle = "green";
+
+        ctx.fillText(
+            "Puzzle Solved!",
+            target.x - 80,
+            target.y + 70
+        );
+        }
 
           animationFrameId = requestAnimationFrame(detectHands);
         }
