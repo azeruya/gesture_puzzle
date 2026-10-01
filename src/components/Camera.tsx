@@ -1,6 +1,21 @@
 import { useEffect, useRef } from "react";
 import { createHandLandmarker } from "../lib/hand/handLandmarker";
 
+const levels = [
+  {
+    piece: { x: 300, y: 200 },
+    target: { x: 500, y: 300 },
+  },
+  {
+    piece: { x: 200, y: 350 },
+    target: { x: 450, y: 150 },
+  },
+  {
+    piece: { x: 500, y: 150 },
+    target: { x: 200, y: 350 },
+  },
+];
+
 export default function Camera() {
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -16,6 +31,8 @@ export default function Camera() {
   });
 
   const isSolvedRef = useRef(false);
+
+  const currentLevelRef = useRef(0);
 
   useEffect(() => {
     let animationFrameId: number;
@@ -75,6 +92,15 @@ export default function Camera() {
 
             const indexTip = landmarks[8];
             const thumbTip = landmarks[4];
+            const middleTip = landmarks[12];
+            const ringTip = landmarks[16];
+            const pinkyTip = landmarks[20];
+            const wrist = landmarks[0];
+
+            const isFist =
+                middleTip.y > wrist.y &&
+                ringTip.y > wrist.y &&
+                pinkyTip.y > wrist.y;
 
             const indexX = indexTip.x * canvas.width;
             const indexY = indexTip.y * canvas.height;
@@ -127,9 +153,33 @@ export default function Camera() {
                         // Snap the piece to the target
                         piece.x = target.x;
                         piece.y = target.y;
+
                         isSolvedRef.current = true;
+
                         console.log("PUZZLE SOLVED YURR!");
-                    }
+
+                        setTimeout(() => {
+                            const nextLevel = currentLevelRef.current + 1;
+
+                            if (nextLevel < levels.length) {
+                            currentLevelRef.current = nextLevel;
+
+                            piecePositionRef.current = {
+                                ...levels[nextLevel].piece,
+                            };
+
+                            targetPositionRef.current = {
+                                ...levels[nextLevel].target,
+                            };
+
+                            isSolvedRef.current = false;
+
+                            console.log("NEXT LEVEL:", nextLevel + 1);
+                            } else {
+                            console.log("YOU WIN!");
+                            }
+                        }, 1000);
+                        }
                 }
                 isGrabbing = false;
             }
@@ -139,7 +189,13 @@ export default function Camera() {
             ctx.arc(indexX, indexY, 12, 0, Math.PI * 2);
             ctx.fill();
 
-            console.log(isPinching ? "PINCH" : "RELEASE");
+            if (isPinching) {
+                console.log("PINCH");
+                } else if (isFist) {
+                console.log("FIST");
+                } else {
+                console.log("OPEN");
+                }
           }
 
           // Get current positions
